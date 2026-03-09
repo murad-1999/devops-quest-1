@@ -1,0 +1,98 @@
+services:
+  # --- Frontend Tier Services ---
+  vote:
+    build:
+      context: ./vote
+    container_name: vote
+    ports:
+      - "8080:80"
+    networks:
+      - frontend-tier
+      - backend-tier
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  result:
+    build:
+      context: ./result
+    container_name: result
+    ports:
+      - "8081:4000"
+    networks:
+      - frontend-tier
+      - backend-tier
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+
+  # --- Backend Tier Services ---
+  worker:
+    build:
+      context: ./worker
+    container_name: worker
+    networks:
+      - backend-tier
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: always
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    networks:
+      - backend-tier
+    healthcheck:
+      test: [ "CMD-SHELL", "sh /healthchecks/redis.sh" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./healthchecks/redis.sh:/healthchecks/redis.sh
+    restart: always
+
+  db:
+    image: postgres:15-alpine
+    container_name: db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    networks:
+      - backend-tier
+    healthcheck:
+      test: [ "CMD-SHELL", "bash /healthchecks/postgres.sh" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./healthchecks/postgres.sh:/healthchecks/postgres.sh
+    restart: always
+
+  # --- Utility Services ---
+  seed:
+    build:
+      context: ./seed-data
+    container_name: seed
+    profiles:
+      - seed
+    networks:
+      - frontend-tier
+    depends_on:
+      vote:
+        condition: service_started
+
+networks:
+  frontend-tier:
+    driver: bridge
+  backend-tier:
+    driver: bridge
+
+volumes:
+  db-data:
