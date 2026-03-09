@@ -1,34 +1,35 @@
-# Use the official Python slim image for a smaller footprint
-FROM python:3.9-slim
+# Stage 1: Build dependencies
+FROM python:3.9-alpine AS builder
 
-# Set environment variables to optimize Python performance
-# PYTHONDONTWRITEBYTECODE=1: Prevents Python from writing .pyc files
-# PYTHONUNBUFFERED=1: Ensures logs are sent directly to the terminal
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# Set the working directory inside the container
 WORKDIR /app
 
-# Install system dependencies (curl is useful for health checks)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev libffi-dev
 
-# Copy the requirements file first to leverage Docker's caching mechanism
 COPY requirements.txt .
+# Install dependencies
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Install the application's Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Stage 2: Final runtime image
+FROM python:3.9-alpine
+
+WORKDIR /app
+
+# Copy only the installed dependencies from the builder stage
+COPY --from=builder /install /usr/local
 
 # Copy the rest of the application source code
 COPY . .
 
+# Set environment variables to optimize Python performance
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Install curl for health checks in the final image
+RUN apk add --no-cache curl
+
 # Explicitly declare that the container listens on port 80
 EXPOSE 80
 
-# Run the application using gunicorn for better production performance
-# -b 0.0.0.0:80: Bind the server to all network interfaces on port 80
-# --workers 4: Use multiple worker processes for better concurrency
-# --log-file -: Send logs to stdout for easy viewing in Docker logs
+# Run the application using gunicorn
 CMD ["gunicorn", "app:app", "-b", "0.0.0.0:80", "--log-file", "-", "--access-logfile", "-", "--workers", "4", "--keep-alive", "0"]

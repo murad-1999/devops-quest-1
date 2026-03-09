@@ -1,17 +1,24 @@
-# Use a lightweight Node.js LTS image
-FROM node:18-slim
+# Stage 1: Build dependencies
+FROM node:18-alpine AS builder
 
-# Set working directory
 WORKDIR /app
-
-# Set environment to production
-ENV NODE_ENV=production
 
 # Copy package files first for caching
 COPY package*.json ./
 
 # Install only production dependencies
 RUN npm install --omit=dev && npm cache clean --force
+
+# Stage 2: Final runtime image
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Copy only the node_modules from the builder stage
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application source
 COPY . .
