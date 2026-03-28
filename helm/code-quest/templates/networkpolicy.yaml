@@ -1,0 +1,52 @@
+# Network Policy allowing only 'worker' and 'result' pods to access PostgreSQL
+# Denies all other ingress and denies all egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "code-quest.fullname" . }}-postgres-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql # Target Bitnami Postgres pod
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: worker
+        - podSelector:
+            matchLabels:
+              app: result
+      ports:
+        - protocol: TCP
+          port: 5432
+  # By omitting the 'egress' block entirely while having 'Egress' in policyTypes, all egress is denied.
+
+---
+# Network Policy allowing only 'vote' and 'worker' pods to access Redis
+# Denies all other ingress and denies all egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "code-quest.fullname" . }}-redis-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis # Target Bitnami Redis pod
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: vote
+        - podSelector:
+            matchLabels:
+              app: worker
+      ports:
+        - protocol: TCP
+          port: 6379
+  # By omitting the 'egress' block entirely while having 'Egress' in policyTypes, all egress is denied.
