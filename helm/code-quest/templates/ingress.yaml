@@ -1,0 +1,32 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "code-quest.fullname" . }}
+  labels:
+    app: code-quest
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+spec:
+  rules:
+    - host: "vote.{{ .Values.global.domain }}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "code-quest.fullname" . }}-vote
+                port:
+                  number: {{ .Values.vote.service.port }}
+    - host: "result.{{ .Values.global.domain }}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "code-quest.fullname" . }}-result
+                port:
+                  number: {{ .Values.result.service.port }}
+{{- end }}

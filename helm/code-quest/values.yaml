@@ -1,0 +1,73 @@
+# Default values for code-quest helm chart.
+
+global:
+  domain: "vote.127.0.0.1.nip.io" # Replace with actual LoadBalancer IP from NGINX ingress after deployment
+  projectId: "project-749947f2-d37f-4dad-9f9" # Required for ExternalSecrets integration
+  imagePrefix: "us-west1-docker.pkg.dev/project-749947f2-d37f-4dad-9f9/code-quest-vote"
+  imageTag: "latest"
+
+vote:
+  replicaCount: 2
+  image:
+    repository: "vote"
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+
+result:
+  replicaCount: 1
+  image:
+    repository: "result"
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+
+worker:
+  replicaCount: 2
+  image:
+    repository: "worker"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 300m
+      memory: 512Mi
+    requests:
+      cpu: 150m
+      memory: 256Mi
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+
+ingress:
+  enabled: true
+  className: "nginx"
+
+config:
+  redisHost: "redis-master" # Adjust if using different name for bitnami redis
+  postgresHost: "dbl-postgresql" # Adjust if using different name for bitnami postgres
+
+externalSecrets:
+  enabled: true
+  gcpSecretName: "dev-postgres-password" # The name of the secret in GCP created via Terraform

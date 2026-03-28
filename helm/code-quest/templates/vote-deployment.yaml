@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "code-quest.fullname" . }}-vote
+  labels:
+    app: vote
+spec:
+  replicas: {{ .Values.vote.replicaCount }}
+  selector:
+    matchLabels:
+      app: vote
+  template:
+    metadata:
+      labels:
+        app: vote
+    spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.vote.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.vote.securityContext.runAsUser }}
+      containers:
+        - name: vote
+          image: "{{ .Values.global.imagePrefix }}/{{ .Values.vote.image.repository }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.vote.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.vote.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "code-quest.fullname" . }}-config
+            - secretRef:
+                name: {{ include "code-quest.fullname" . }}-secret

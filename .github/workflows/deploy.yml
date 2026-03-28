@@ -1,0 +1,125 @@
+name: Build and Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ vars.PROJECT_ID }} # e.g. project-749947f2-d37f-4dad-9f9
+  REGION: ${{ vars.REGION }}         # e.g. us-west1
+  GKE_CLUSTER: ${{ vars.GKE_CLUSTER }}
+  WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
+  WIF_SERVICE_ACCOUNT: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+  REGISTRY: "${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/code-quest-vote"
+  DOMAIN: ${{ vars.DOMAIN }}
+
+jobs:
+  build-scan-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Required for Workload Identity Federation authentication
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        token_format: 'access_token'
+        workload_identity_provider: ${{ env.WIF_PROVIDER }}
+        service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+    - name: Setup Docker and GCloud Auth
+      run: |
+        gcloud auth configure-docker us-west1-docker.pkg.dev --quiet
+        
+    - name: Setup GKE Credentials
+      uses: google-github-actions/get-gke-credentials@v2
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.REGION }}
+        project_id: ${{ env.PROJECT_ID }}
+
+    - name: Setup Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: v3.14.0
+
+    - name: Build Docker Images
+      run: |
+        docker build -t ${{ env.REGISTRY }}/vote:${{ github.sha }} ./vote
+        docker build -t ${{ env.REGISTRY }}/worker:${{ github.sha }} ./worker
+        docker build -t ${{ env.REGISTRY }}/result:${{ github.sha }} ./result
+        
+    - name: Trivy Scan (Vote)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.REGISTRY }}/vote:${{ github.sha }}'
+        format: 'table'
+        exit-code: '1' # Fails the build
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL'
+
+    - name: Trivy Scan (Worker)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.REGISTRY }}/worker:${{ github.sha }}'
+        format: 'table'
+        exit-code: '1' # Fails the build
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL'
+
+    - name: Trivy Scan (Result)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.REGISTRY }}/result:${{ github.sha }}'
+        format: 'table'
+        exit-code: '1' # Fails the build
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL'
+
+    - name: Push Verified Images
+      run: |
+        docker push ${{ env.REGISTRY }}/vote:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/worker:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/result:${{ github.sha }}
+
+    - name: Deploy to GKE via Helm
+      run: |
+        helm upgrade --install code-quest ./helm/code-quest \
+          --namespace code-quest \
+          --create-namespace \
+          --set global.imageTag=${{ github.sha }} \
+          --set global.domain=${{ env.DOMAIN }} \
+          --wait --timeout 300s
+
+    - name: Smoke Test (curl)
+      run: |
+        # Wait a few seconds for Ingress rules to fully propagate
+        sleep 10
+        
+        echo "Testing Vote Endpoint (vote.${{ env.DOMAIN }})..."
+        # -f = fail silently on HTTP error, -s = silent mode, -o /dev/null = ignore body, -w = print status code
+        VOTE_CODE=$(curl -s -L -o /dev/null -w "%{http_code}" http://vote.${{ env.DOMAIN }}/)
+        
+        if [ "$VOTE_CODE" -ne 200 ] && [ "$VOTE_CODE" -ne 301 ]; then
+          echo "Smoke test FAILED! Vote app returned HTTP $VOTE_CODE"
+          exit 1
+        fi
+        
+        echo "Testing Result Endpoint (result.${{ env.DOMAIN }})..."
+        RESULT_CODE=$(curl -s -L -o /dev/null -w "%{http_code}" http://result.${{ env.DOMAIN }}/)
+        
+        if [ "$RESULT_CODE" -ne 200 ] && [ "$RESULT_CODE" -ne 301 ]; then
+          echo "Smoke test FAILED! Result app returned HTTP $RESULT_CODE"
+          exit 1
+        fi
+        
+        echo "All Smoke Tests Passed Successfully!"

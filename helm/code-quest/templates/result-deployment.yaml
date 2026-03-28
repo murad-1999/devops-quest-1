@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "code-quest.fullname" . }}-result
+  labels:
+    app: result
+spec:
+  replicas: {{ .Values.result.replicaCount }}
+  selector:
+    matchLabels:
+      app: result
+  template:
+    metadata:
+      labels:
+        app: result
+    spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.result.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.result.securityContext.runAsUser }}
+      containers:
+        - name: result
+          image: "{{ .Values.global.imagePrefix }}/{{ .Values.result.image.repository }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.result.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 4000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.result.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "code-quest.fullname" . }}-config
+            - secretRef:
+                name: {{ include "code-quest.fullname" . }}-secret

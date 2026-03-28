@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "code-quest.fullname" . }}-worker
+  labels:
+    app: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.worker.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.worker.securityContext.runAsUser }}
+      containers:
+        - name: worker
+          image: "{{ .Values.global.imagePrefix }}/{{ .Values.worker.image.repository }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "code-quest.fullname" . }}-config
+            - secretRef:
+                name: {{ include "code-quest.fullname" . }}-secret
