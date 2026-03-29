@@ -18,8 +18,8 @@ jobs:
   build-scan-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      id-token: 'write' # Required for Workload Identity Federation authentication
+      contents: 'write' # Required to manage GitHub Actions variables via Terraform
+      id-token: 'write' # Required for Workload Identity Federation
 
     steps:
     - name: Checkout Code
@@ -43,6 +43,18 @@ jobs:
         cluster_name: ${{ env.GKE_CLUSTER }}
         location: ${{ env.REGION }}
         project_id: ${{ env.PROJECT_ID }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Provision Infrastructure via Terraform
+      working-directory: ./terraform
+      run: |
+        terraform init
+        terraform workspace select dev || terraform workspace new dev
+        terraform apply -var-file=environments/dev.tfvars -auto-approve
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Helm
       uses: azure/setup-helm@v4
@@ -100,7 +112,7 @@ jobs:
           --namespace external-secrets \
           --create-namespace \
           --set installCRDs=true \
-          --set serviceAccount.annotations."iam\.gke\.io/gcp-service-account"="dev-eso-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
+          --set-json '{"serviceAccount": {"annotations": {"iam.gke.io/gcp-service-account": "dev-eso-sa@'${{ env.PROJECT_ID }}'.iam.gserviceaccount.com"}}}' \
           --wait --timeout 300s
 
         # 2. NGINX Ingress Controller
