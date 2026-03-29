@@ -91,6 +91,25 @@ jobs:
         docker push ${{ env.REGISTRY }}/worker:${{ github.sha }}
         docker push ${{ env.REGISTRY }}/result:${{ github.sha }}
 
+    - name: Install Infrastructure Pre-requisites (ESO & Ingress)
+      run: |
+        # 1. External Secrets Operator (Required for ExternalSecret manifests)
+        helm repo add external-secrets https://charts.external-secrets.io
+        helm repo update
+        helm upgrade --install external-secrets external-secrets/external-secrets \
+          --namespace external-secrets \
+          --create-namespace \
+          --set installCRDs=true \
+          --wait --timeout 300s
+
+        # 2. NGINX Ingress Controller
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+          --namespace ingress-nginx \
+          --create-namespace \
+          --wait --timeout 300s
+
     - name: Deploy to GKE via Helm
       run: |
         helm upgrade --install code-quest ./helm/code-quest \
