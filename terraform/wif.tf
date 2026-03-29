@@ -12,9 +12,9 @@ resource "google_project_iam_member" "github_actions_ar_writer" {
 }
 
 # Grant the Service Account permissions to deploy to GKE
-resource "google_project_iam_member" "github_actions_gke_developer" {
+resource "google_project_iam_member" "github_actions_gke_cluster_admin" {
   project = var.project_id
-  role    = "roles/container.developer"
+  role    = "roles/container.clusterAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 

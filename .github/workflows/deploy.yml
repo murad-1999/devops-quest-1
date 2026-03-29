@@ -100,6 +100,7 @@ jobs:
           --namespace external-secrets \
           --create-namespace \
           --set installCRDs=true \
+          --set serviceAccount.annotations."iam\.gke\.io/gcp-service-account"="dev-eso-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
           --wait --timeout 300s
 
         # 2. NGINX Ingress Controller
