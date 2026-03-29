@@ -26,3 +26,15 @@ variable "max_node_count" {
   description = "Max node count per zone for autoscaling"
   default     = 3
 }
+
+variable "github_repository" {
+  type        = string
+  description = "The name of your GitHub repository (e.g. devops-quest-1)"
+  default     = "devops-quest-1" 
+}
+
+variable "github_owner" {
+  type        = string
+  description = "The GitHub username or organization holding the repository"
+  default     = "murad-1999" 
+}

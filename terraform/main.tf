@@ -1,3 +1,16 @@
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">= 5.0"
+    }
+    github = {
+      source  = "integrations/github"
+      version = "~> 6.0"
+    }
+  }
+}
+
 provider "google" {
   project = var.project_id
   region  = var.region
@@ -31,6 +44,31 @@ resource "google_compute_subnetwork" "subnet" {
 resource "google_service_account" "gke_sa" {
   account_id   = "${terraform.workspace}-gke-sa"
   display_name = "Service Account for GKE nodes in ${terraform.workspace}"
+}
+
+# --- Standard GKE SA Roles (Least Privilege) ---
+resource "google_project_iam_member" "gke_sa_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+
+resource "google_project_iam_member" "gke_sa_metric_writer" {
+  project = var.project_id
+  role    = "roles/monitoring.metricWriter"
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+
+resource "google_project_iam_member" "gke_sa_monitoring_viewer" {
+  project = var.project_id
+  role    = "roles/monitoring.viewer"
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+
+resource "google_project_iam_member" "gke_sa_registry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
 }
 
 # GKE Cluster
@@ -74,7 +112,9 @@ resource "google_container_node_pool" "primary_nodes" {
     machine_type = var.machine_type
     service_account = google_service_account.gke_sa.email
     oauth_scopes    = [
-      "https://www.googleapis.com/auth/cloud-platform"
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/devstorage.read_only"
     ]
     # Optionally use spot instances to reduce costs in 'dev' workspace
     spot = terraform.workspace == "dev" ? true : false

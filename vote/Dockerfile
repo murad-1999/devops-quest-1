@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM python:3.9-alpine AS builder
+FROM python:3.11-alpine3.19 AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Stage 2: Final runtime image
-FROM python:3.9-alpine
+FROM python:3.11-alpine3.19
 
 WORKDIR /app
 
@@ -25,8 +25,9 @@ COPY . .
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Install curl for health checks in the final image
-RUN apk add --no-cache curl
+# Upgrade system packages implicitly to patch any 0-day CVEs and install curl
+RUN apk upgrade --no-cache && \
+    apk add --no-cache curl
 
 # Explicitly declare that the container listens on port 80
 EXPOSE 80
