@@ -18,6 +18,15 @@ resource "google_project_iam_member" "github_actions_gke_cluster_admin" {
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
+# Grant the Service Account permissions to read/write the GCS Terraform state bucket.
+# Required by `terraform init` to access the remote GCS backend.
+# roles/storage.objectAdmin covers: list, get, create, delete, and lock state objects.
+resource "google_storage_bucket_iam_member" "github_actions_tfstate" {
+  bucket = "${var.project_id}-tfstate"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
 # Create a Workload Identity Pool
 resource "google_iam_workload_identity_pool" "github_pool" {
   workload_identity_pool_id = "github-deploy-pool"
