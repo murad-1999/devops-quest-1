@@ -36,3 +36,4 @@ terraform.rc
 
 # Ignore logs
 tf.log
+fix_iam_permissions.sh
