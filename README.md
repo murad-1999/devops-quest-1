@@ -1,7 +1,7 @@
 # Voting Application - DevOps Challenge
 
 ## Project Overview
-
+!!
 This is a distributed voting application that allows users to vote between two options and view real-time results. The application consists of multiple microservices that work together to provide a complete voting experience.
 
 ## Application Architecture
