@@ -12,9 +12,9 @@ resource "google_project_iam_member" "github_actions_ar_writer" {
 }
 
 # Grant the Service Account permissions to deploy to GKE
-resource "google_project_iam_member" "github_actions_gke_cluster_admin" {
+resource "google_project_iam_member" "github_actions_gke_admin" {
   project = var.project_id
-  role    = "roles/container.clusterAdmin"
+  role    = "roles/container.admin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
@@ -25,6 +25,56 @@ resource "google_storage_bucket_iam_member" "github_actions_tfstate" {
   bucket = "${var.project_id}-tfstate"
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# ---------------------------------------------------------------------------
+# Terraform execution roles
+# These are required because the deploy workflow runs `terraform apply`, which
+# creates/manages: VPCs, GKE clusters, service accounts, Artifact Registry
+# repos, Workload Identity pools, project-level IAM bindings, and enables APIs.
+# We use individual named roles (least-privilege) rather than roles/editor.
+# ---------------------------------------------------------------------------
+
+# Manage service accounts and their keys (create GKE SA, WIF bindings, etc.)
+resource "google_project_iam_member" "github_actions_sa_admin" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# Read/write VPC networks and subnets (compute.networks.get, subnets, etc.)
+resource "google_project_iam_member" "github_actions_network_admin" {
+  project = var.project_id
+  role    = "roles/compute.networkAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# Full Artifact Registry management (create repositories, not just push images)
+resource "google_project_iam_member" "github_actions_ar_admin" {
+  project = var.project_id
+  role    = "roles/artifactregistry.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# Enable GCP APIs via Cloud Resource Manager (serviceusage.services.enable)
+resource "google_project_iam_member" "github_actions_serviceusage_admin" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# Create and manage Workload Identity pools and providers (iam.workloadIdentityPools.get, etc.)
+resource "google_project_iam_member" "github_actions_wif_pool_admin" {
+  project = var.project_id
+  role    = "roles/iam.workloadIdentityPoolAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# Set project-level IAM policies (required to bind roles to the GKE SA and ESO SA)
+resource "google_project_iam_member" "github_actions_project_iam_admin" {
+  project = var.project_id
+  role    = "roles/resourcemanager.projectIamAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
 # Create a Workload Identity Pool
