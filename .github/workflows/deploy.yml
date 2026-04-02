@@ -44,6 +44,10 @@ jobs:
         location: ${{ env.REGION }}
         project_id: ${{ env.PROJECT_ID }}
 
+    - name: Create Terraform State Bucket
+      run: |
+        gcloud storage buckets create gs://${{ env.PROJECT_ID }}-tfstate --location=US || echo "Bucket already exists"
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
 

@@ -27,6 +27,13 @@ resource "google_storage_bucket_iam_member" "github_actions_tfstate" {
   member = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
+# Also grant storage admin to create the bucket if needed
+resource "google_project_iam_member" "github_actions_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
 # ---------------------------------------------------------------------------
 # Terraform execution roles
 # These are required because the deploy workflow runs `terraform apply`, which
@@ -66,7 +73,7 @@ resource "google_project_iam_member" "github_actions_serviceusage_admin" {
 # Create and manage Workload Identity pools and providers (iam.workloadIdentityPools.get, etc.)
 resource "google_project_iam_member" "github_actions_wif_pool_admin" {
   project = var.project_id
-  role    = "roles/iam.workloadIdentityPoolAdmin"
+  role    = "roles/iam.workloadIdentityAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
